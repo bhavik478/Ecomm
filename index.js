@@ -28,7 +28,7 @@ const { error } = require("console");
 require("dotenv").config();
 
 const app = express();
-const port = 8000;
+const port = 3000;
 
 connectDB();
 
@@ -93,4 +93,6 @@ app.all("*", (req, res, next) => {
 //Global error Handling middleware
 app.use(globalErrorHandler);
 
-module.exports = app;
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+});
