@@ -8,8 +8,8 @@ const User = require("./models/User");
 const orderRoutes = require("./routes/orderRoutes");
 const ProductRoutes = require("./routes/productRoutes");
 const path = require("path");
-const CustomError = require("./utils/CustomError")
-const globalErrorHandler = require("./controllers/errorController")
+const CustomError = require("./utils/CustomError");
+const globalErrorHandler = require("./controllers/errorController");
 
 const upload = require("./middleware/fileUploadMiddleware");
 
@@ -82,7 +82,10 @@ app.all("*", (req, res, next) => {
   // err.status = "fail";
   // err.statusCode = 404;
 
-  const err = new CustomError(`Can't find ${req.originalUrl} on the server`, 404)
+  const err = new CustomError(
+    `Can't find ${req.originalUrl} on the server`,
+    404
+  );
 
   next(err);
 });
@@ -90,6 +93,4 @@ app.all("*", (req, res, next) => {
 //Global error Handling middleware
 app.use(globalErrorHandler);
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+module.exports = app;
