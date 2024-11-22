@@ -9,6 +9,7 @@ const orderRoutes = require("./routes/orderRoutes");
 const ProductRoutes = require("./routes/productRoutes");
 const path = require("path");
 const CustomError = require("./utils/CustomError");
+const catRouter = require("./routes/categoryRouter");
 const globalErrorHandler = require("./controllers/errorController");
 
 const upload = require("./middleware/fileUploadMiddleware");
@@ -25,6 +26,7 @@ const event = new EventEmitter();
 const cors = require("cors");
 const Product = require("./models/Product");
 const { error } = require("console");
+
 require("dotenv").config();
 
 const app = express();
@@ -44,6 +46,7 @@ app.use("/api", userRoutes);
 app.use("/api", orderRoutes);
 app.use("/api", ProductRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api", catRouter);
 // app.use("/public", express.static("public"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
