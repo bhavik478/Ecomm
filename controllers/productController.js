@@ -66,7 +66,7 @@ const getSingleProduct = async (req, res) => {
     }
     res
       .status(200)
-      .json({ data: products, message: "Product get successfully" });
+      .json({ data: product, message: "Product get successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
