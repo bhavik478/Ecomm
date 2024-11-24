@@ -1,9 +1,10 @@
+const cloudinary = require("../config/cloudinary");
 const Product = require("../models/Product");
 const Category = require("../models/category");
+const fs = require("fs"); // To manage temporary files
 
 // Create a new product using category ID
 const createProduct = async (req, res) => {
-  console.log(req.file, "file");
   try {
     const { categoryId, ...productData } = req.body;
 
@@ -17,12 +18,14 @@ const createProduct = async (req, res) => {
       return res.status(404).json({ error: "Category not found" });
     }
 
-    // Add the category ID to the product
     const body = new Product({ ...productData, category: categoryId });
 
-    // If an image is uploaded, include the image path
     if (req.file) {
-      body.productImage = req.file.path;
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: "products",
+      });
+      body.productImage = result.secure_url;
+      fs.unlinkSync(req.file.path);
     }
 
     await body.save();
@@ -39,16 +42,17 @@ const createProduct = async (req, res) => {
 const getAllProducts = async (req, res) => {
   try {
     const { categoryId } = req.query;
-
     const query = categoryId ? { category: categoryId } : {};
     const products = await Product.find(query).populate(
       "category",
       "name description"
     );
 
-    res
-      .status(200)
-      .json({ data: products, message: "Product get successfully" });
+    res.status(200).json({
+      data: products,
+      message: "Product get successfully",
+      totalProducts: products.length,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -86,24 +90,42 @@ const updateProduct = async (req, res) => {
       updatedData.category = categoryId;
     }
 
-    // If an image is uploaded, update the image path
-    // if (req.file) {
-    //   updatedData.productImage = req.file.path;
-    // }
-
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      updatedData,
-      { new: true, runValidators: true }
-    );
+    // Find the product to update
+    const product = await Product.findById(req.params.id);
 
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
 
-    res
-      .status(200)
-      .json({ data: product, message: "Product updated successfully" });
+    // If a new file is uploaded, upload it to Cloudinary
+    if (req.file) {
+      // Delete the old image from Cloudinary if it exists
+      if (product.productImage) {
+        const publicId = product.productImage.split("/").pop().split(".")[0]; // Extract public_id from the URL
+        await cloudinary.uploader.destroy(`products/${publicId}`);
+      }
+
+      // Upload the new image to Cloudinary
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: "products",
+      });
+      updatedData.productImage = result.secure_url;
+
+      // Delete the temporary file
+      fs.unlinkSync(req.file.path);
+    }
+
+    // Update the product
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id,
+      updatedData,
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      data: updatedProduct,
+      message: "Product updated successfully",
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -113,6 +135,11 @@ const updateProduct = async (req, res) => {
 const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
+    // Delete the old image from Cloudinary if it exists
+    if (product.productImage) {
+      const publicId = product.productImage.split("/").pop().split(".")[0]; // Extract public_id from the URL
+      await cloudinary.uploader.destroy(`products/${publicId}`);
+    }
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
