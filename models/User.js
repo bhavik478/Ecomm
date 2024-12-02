@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema(
       enum: { values: ["admin", "user"], message: "This Role dose not exist" },
       default: "user",
     },
-    image: {
+    profileImage: {
       type: String,
       default: null,
     },
