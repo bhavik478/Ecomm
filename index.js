@@ -7,6 +7,7 @@ const authRoutes = require("./routes/authRoutes");
 const User = require("./models/User");
 const orderRoutes = require("./routes/orderRoutes");
 const ProductRoutes = require("./routes/productRoutes");
+const CartRoute = require("./routes/cartRoute");
 const path = require("path");
 const CustomError = require("./utils/CustomError");
 const catRouter = require("./routes/categoryRouter");
@@ -47,6 +48,7 @@ app.use("/api", orderRoutes);
 app.use("/api", ProductRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api", catRouter);
+app.use("/api", CartRoute);
 // app.use("/public", express.static("public"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 

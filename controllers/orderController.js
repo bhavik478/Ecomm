@@ -1,111 +1,142 @@
+const Cart = require("../models/Cart");
 const Order = require("../models/Order");
-const mongoose = require ("mongoose")
+const Product = require("../models/Product");
 
 const createOrder = async (req, res) => {
   try {
-    const body = new Order(req.body);
-    await body.save();
+    const { userId, products } = req.body;
 
-    res.status(201).json(body);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    // Fetch prices from Product schema and calculate total
+    let totalPrice = 0;
+    const enrichedProducts = await Promise.all(
+      products.map(async (item) => {
+        const product = await Product.findById(item.productId);
+        if (!product)
+          throw new Error(`Product with ID ${item.productId} not found`);
+        totalPrice += product.price * item.quantity; // Assuming Product schema has a `price` field
+        return {
+          productId: item.productId,
+          quantity: item.quantity,
+          productTotal: product.price * item.quantity,
+        };
+      })
+    );
+
+    // Create order
+    const order = new Order({
+      userId,
+      products: enrichedProducts,
+      totalPrice,
+      status: "Pending", // Default status
+    });
+
+    const savedOrder = await order.save();
+    res.status(201).json(savedOrder);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 };
 
-const getOrders = async (req, res) => {
+const createOrderByCartId = async (req, res) => {
   try {
-    const orders = await Order.aggregate([
-      {
-        $lookup: {
-          from: "users",
-          localField: "user_id",
-          foreignField: "_id",
-          as: "user",
-        },
-      },
-      {
-        $lookup: {
-          from: "products",
-          localField: "product_id",
-          foreignField: "_id",
-          as: "product",
-        },
-      },
-      {
-        $unwind: "$user",
-      },
-      {
-        $unwind: "$product",
-      },
-      {
-        $project: { "user.password": 0, product_id: 0, user_id: 0 },
-      },
-    ]);
+    const { cartId } = req.params;
+    console.log({ cartId });
+    // Fetch the cart by its ID and populate product details
+    const cart = await Cart.findById(cartId).populate("products.productId");
+    if (!cart) return res.status(404).json({ message: "Cart not found" });
 
-    // const orders = await Order.find().populate("user_id")
+    // Calculate total price from cart products
+    let totalPrice = 0;
+    const orderProducts = cart.products.map((item) => {
+      const productPrice = item.productId.price; // Assume `price` exists in the Product schema
+      totalPrice += productPrice * item.quantity;
 
+      return {
+        productId: item.productId._id,
+        quantity: item.quantity,
+        productTotal: productPrice * item.quantity, // Price at the time of order creation
+      };
+    });
+
+    console.log({
+      userId: cart.userId,
+      products: orderProducts,
+      totalPrice,
+      status: "Pending", // Default status
+    });
+
+    // Create a new order
+    const order = new Order({
+      userId: cart.userId,
+      products: orderProducts,
+      totalPrice,
+      status: "Pending", // Default status
+    });
+
+    const savedOrder = await order.save();
+
+    // Optionally, you can clear the cart after order creation
+    await Cart.findByIdAndDelete(cartId);
+
+    res.status(201).json(savedOrder);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const getAllOrdersByUserId = async (req, res) => {
+  try {
+    const orders = await Order.find({ userId: req.params.userId }).populate(
+      "products.productId"
+    );
     res.json(orders);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const updateOrderStatus = async (req, res) => {
+  try {
+    const updatedOrder = await Order.findByIdAndUpdate(
+      req.params.id,
+      { $set: { status: req.body.status } },
+      { new: true }
+    );
+    res.json(updatedOrder);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 };
 
 const getOrderById = async (req, res) => {
   try {
-    const orderId = new mongoose.Types.ObjectId(req.params.id);
-    const order = await Order.aggregate([
-      { $match: { _id: orderId } },
-      {
-        $lookup: {
-          from: "users",
-          localField: "user_id",
-          foreignField: "_id",
-          as: "user",
-        },
-      },
-      {
-        $lookup: {
-          from: "products",
-          localField: "product_id",
-          foreignField: "_id",
-          as: "product",
-        },
-      },
-      {
-        $unwind: "$user",
-      },
-      {
-        $unwind: "$product",
-      },
-      {
-        $project: { "user.password": 0, product_id: 0, user_id: 0 },
-      },
-    ]);
+    const order = await Order.findById(req.params.id).populate(
+      "products.productId"
+    );
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const deleteOrder = async (req, res) => {
+  try {
+    const order = await Order.findByIdAndDelete(req.params.id);
     if (!order) {
       return res.status(404).json({ error: "order not found" });
     }
-    res.status(200).json(order);
+    res.status(200).json({ message: "order deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-
-const deleteOrder = async (req, res) => {
-  try {
-      const order = await Order.findByIdAndDelete(req.params.id);
-      if (!order) { 
-          return res.status(404).json({ error: 'order not found' });
-      }
-      res.status(200).json({ message: 'order deleted successfully' });
-  } catch (error) {
-      res.status(500).json({ error: error.message });
-  }
-};
-
 module.exports = {
-  getOrders,
   createOrder,
+  getAllOrdersByUserId,
+  createOrderByCartId,
+  updateOrderStatus,
   getOrderById,
-  deleteOrder
+  deleteOrder,
 };
